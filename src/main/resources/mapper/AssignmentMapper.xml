@@ -1,0 +1,149 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.no99.edunexusassignment_and_assessment.mapper.AssignmentMapper">
+
+    <!-- 结果映射 -->
+    <resultMap id="AssignmentResultMap" type="com.no99.edunexusassignment_and_assessment.entity.Assignment">
+        <id column="id" property="id"/>
+        <result column="course_id" property="courseId"/>
+        <result column="module_id" property="moduleId"/>
+        <result column="title" property="title"/>
+        <result column="description" property="description"/>
+        <result column="assignment_type" property="assignmentType" typeHandler="org.apache.ibatis.type.EnumTypeHandler"/>
+        <result column="max_points" property="maxPoints"/>
+        <result column="due_date" property="dueDate"/>
+        <result column="available_date" property="availableDate"/>
+        <result column="max_attempts" property="maxAttempts"/>
+        <result column="is_published" property="isPublished"/>
+        <result column="created_at" property="createdAt"/>
+        <result column="updated_at" property="updatedAt"/>
+    </resultMap>
+
+    <!-- 插入作业 -->
+    <insert id="insert" parameterType="com.no99.edunexusassignment_and_assessment.entity.Assignment" useGeneratedKeys="true" keyProperty="id">
+        INSERT INTO assignments (
+            course_id, module_id, title, description, assignment_type,
+            max_points, due_date, available_date, max_attempts,
+            is_published, created_at, updated_at
+        ) VALUES (
+            #{courseId}, #{moduleId}, #{title}, #{description}, #{assignmentType},
+            #{maxPoints}, #{dueDate}, #{availableDate}, #{maxAttempts},
+            #{isPublished}, #{createdAt}, #{updatedAt}
+        )
+    </insert>
+
+    <!-- 更新作业 -->
+    <update id="update" parameterType="com.no99.edunexusassignment_and_assessment.entity.Assignment">
+        UPDATE assignments
+        SET course_id = #{courseId},
+            module_id = #{moduleId},
+            title = #{title},
+            description = #{description},
+            assignment_type = #{assignmentType},
+            max_points = #{maxPoints},
+            due_date = #{dueDate},
+            available_date = #{availableDate},
+            max_attempts = #{maxAttempts},
+            is_published = #{isPublished},
+            updated_at = #{updatedAt}
+        WHERE id = #{id}
+    </update>
+
+    <!-- 根据ID删除作业 -->
+    <delete id="deleteById" parameterType="int">
+        DELETE FROM assignments WHERE id = #{id}
+    </delete>
+
+    <!-- 根据ID查询作业 -->
+    <select id="selectById" parameterType="int" resultMap="AssignmentResultMap">
+        SELECT * FROM assignments WHERE id = #{id}
+    </select>
+
+    <!-- 动态查询条件 -->
+    <sql id="whereClause">
+        <where>
+            <if test="courseId != null">
+                AND course_id = #{courseId}
+            </if>
+            <if test="moduleId != null">
+                AND module_id = #{moduleId}
+            </if>
+            <if test="isPublished != null">
+                AND is_published = #{isPublished}
+            </if>
+            <if test="assignmentType != null">
+                AND assignment_type = #{assignmentType}
+            </if>
+        </where>
+    </sql>
+
+    <!-- 条件查询作业列表 -->
+    <select id="selectByConditions" resultMap="AssignmentResultMap">
+        SELECT * FROM assignments
+        <include refid="whereClause"/>
+        ORDER BY created_at DESC
+        <if test="limit != null and offset != null">
+            LIMIT #{offset}, #{limit}
+        </if>
+    </select>
+
+    <!-- 查询课程下的所有作业 -->
+    <select id="selectByCourseId" parameterType="int" resultMap="AssignmentResultMap">
+        SELECT * FROM assignments
+        WHERE course_id = #{courseId}
+        ORDER BY created_at DESC
+    </select>
+
+    <!-- 查询模块下的所有作业 -->
+    <select id="selectByModuleId" parameterType="int" resultMap="AssignmentResultMap">
+        SELECT * FROM assignments
+        WHERE module_id = #{moduleId}
+        ORDER BY created_at DESC
+    </select>
+
+    <!-- 查询已发布的作业 -->
+    <select id="selectPublished" resultMap="AssignmentResultMap">
+        SELECT * FROM assignments
+        WHERE is_published = true
+        ORDER BY created_at DESC
+    </select>
+
+    <!-- 统计作业数量 -->
+    <select id="countByConditions" resultType="int">
+        SELECT COUNT(*) FROM assignments
+        <include refid="whereClause"/>
+    </select>
+
+    <!-- 发布作业 -->
+    <update id="publishAssignment" parameterType="int">
+        UPDATE assignments
+        SET is_published = true, updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- 取消发布作业 -->
+    <update id="unpublishAssignment" parameterType="int">
+        UPDATE assignments
+        SET is_published = false, updated_at = NOW()
+        WHERE id = #{id}
+    </update>
+
+    <!-- 查询作业统计信息 -->
+    <select id="selectAssignmentStats" parameterType="int" resultType="java.util.Map">
+        SELECT
+            COUNT(*) as total_count,
+            COUNT(CASE WHEN is_published = true THEN 1 END) as published_count,
+            COUNT(CASE WHEN is_published = false THEN 1 END) as draft_count,
+            COUNT(CASE WHEN assignment_type = 'HOMEWORK' THEN 1 END) as homework_count,
+            COUNT(CASE WHEN assignment_type = 'QUIZ' THEN 1 END) as quiz_count,
+            COUNT(CASE WHEN assignment_type = 'EXAM' THEN 1 END) as exam_count,
+            COUNT(CASE WHEN assignment_type = 'PROJECT' THEN 1 END) as project_count,
+            COUNT(CASE WHEN due_date &lt; NOW() THEN 1 END) as overdue_count,
+            AVG(max_points) as avg_max_points
+        FROM assignments
+        <if test="courseId != null">
+            WHERE course_id = #{courseId}
+        </if>
+    </select>
+
+</mapper>
