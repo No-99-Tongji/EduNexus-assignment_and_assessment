@@ -1,0 +1,101 @@
+# Maven 构建输出
+target/
+!target/*.jar
+
+# Maven wrapper
+.mvn/wrapper/maven-wrapper.jar
+
+# IDE 配置文件
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.classpath
+.project
+.factorypath
+
+# 日志文件
+*.log
+logs/
+
+# 临时文件
+*.tmp
+*.bak
+*.swp
+*~.nib
+.DS_Store
+
+# Git
+.git/
+.gitignore
+.gitattributes
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose.yml
+*.dockerfile
+
+# 文档
+README.md
+HELP.md
+*.md
+
+# 测试相关
+src/test/
+**/test/
+
+# 环境配置（避免将本地配置打包到镜像）
+.env
+.env.local
+*.env
+
+# 其他
+node_modules/
+npm-debug.log
+# 多阶段构建 Dockerfile for Spring Boot Application
+
+# 第一阶段：构建阶段
+FROM maven:3.9-eclipse-temurin-17-alpine AS builder
+
+# 设置工作目录
+WORKDIR /app
+
+# 复制 pom.xml 和下载依赖（利用 Docker 缓存层）
+COPY pom.xml .
+RUN mvn dependency:go-offline -B
+
+# 复制源代码
+COPY src ./src
+
+# 构建应用（跳过测试以加快构建速度）
+RUN mvn clean package -DskipTests -B
+
+# 第二阶段：运行阶段
+FROM eclipse-temurin:17-jre-alpine
+
+# 设置工作目录
+WORKDIR /app
+
+# 创建非 root 用户来运行应用
+RUN addgroup -S spring && adduser -S spring -G spring
+USER spring:spring
+
+# 从构建阶段复制 jar 文件
+COPY --from=builder /app/target/*.jar app.jar
+
+# 暴露应用端口
+EXPOSE 8083
+
+# JVM 优化参数
+ENV JAVA_OPTS="-Xms256m -Xmx512m -XX:+UseContainerSupport -XX:MaxRAMPercentage=75.0"
+
+# 健康检查
+HEALTHCHECK --interval=30s --timeout=3s --start-period=60s --retries=3 \
+    CMD wget --no-verbose --tries=1 --spider http://localhost:8083/api/v1/actuator/health || exit 1
+
+# 启动应用
+ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar app.jar"]
+
